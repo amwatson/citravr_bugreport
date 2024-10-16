@@ -24,9 +24,11 @@ def shell_cmd(cmd, verbose=False, show_interium_output=False):
     except sp.CalledProcessError as e:
         return e.output.decode('utf-8')
 
-# adb binary is located at [path to this file]/bin/[windows|linux|darwin]/adb
+# adb binary is located at [path to this file]/bin/[win32|linux|darwin]/adb
 def find_adb():
     platform_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bin', sys.platform, 'adb')
+    if sys.platform == "win32":
+        platform_path += ".exe"
     return platform_path
 
 def select_device_id(devices):
@@ -84,20 +86,24 @@ def main():
 
     adb_path = find_adb()
     if not os.path.exists(adb_path):
-        print(f"Error: adb binary not found for platform {sys.platform}")
+        print(f"Error: adb binary not found for platform {sys.platform} ({adb_path})")
         sys.exit(1)
 
     # Check that the device is connected (USB or tcpip)
-    devices = shell_cmd(f"{adb_path} devices").split('\n')[1:-2]
+    device_output = shell_cmd(f"{adb_path} devices")
+    devices = device_output.split('\n')[1:-1]
+    
+    if not devices or "device" not in devices[0]:
+        print("Error: No device found. Make sure your device is connected.")
+        sys.exit(1)
+
     preferred_device_id = select_device_id(devices)
     if not preferred_device_id:
         print("Error: No device found. Make sure your device is connected.")
         sys.exit(1)
 
     # Create the tmp directory if it doesn't exist
-    if os.path.exists(tmpdir_path):
-        shell_cmd(f"rm -rf {tmpdir_path}")
-    os.makedirs(tmpdir_path)
+    os.makedirs(tmpdir_path, exist_ok=True)
 
     # Capture screenshot
     if args.screenshot:
